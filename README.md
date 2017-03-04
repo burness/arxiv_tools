@@ -22,3 +22,9 @@
 https://arxiv.org/list//pastweek?skip=0&show=1000
 
 ```
+
+### TODO
+ - [x] extract the information of the pdf
+ - [x] add the support of multi thread to download pdfs
+ - [] add the config of the url including research area
+ 
