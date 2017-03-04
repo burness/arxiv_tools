@@ -30,7 +30,6 @@ class ArxivPdfs():
         
         content = html.fromstring(result.content)
         print 'read web successfully'
-        # pdf_links = content.xpath('//span[@class="list-identifier"]//a[@title="Download PDF"]/@href')
         pdf_ids = content.xpath('//span[@class="list-identifier"]//a[@title="Abstract"]/text()')
         pdf_links = ['https://arxiv.org'+i+'.pdf' for i in content.xpath('//span[@class="list-identifier"]//a[@title="Download PDF"]/@href')]
         pdf_titles = [i.strip() for i in filter(lambda x : x!='\n', content.xpath('//div[@class="list-title mathjax"]/text()'))]
@@ -41,12 +40,6 @@ class ArxivPdfs():
         pdf_authors = [author.replace('\n','') for author in pdf_authors]
         pdf_authors = [author.replace('Authors: ','') for author in pdf_authors]
         pdf_subjects = content.xpath('//span[@class="primary-subject"]/text()')
-        print pdf_ids[:2], len(pdf_ids)
-        print pdf_links[:2], len(pdf_links)
-        print pdf_authors[:2], len(pdf_authors)
-        print pdf_authors_links[:2], len(pdf_authors_links)
-        print pdf_subjects[:2], len(pdf_subjects)
-        print pdf_titles[:2], len(pdf_titles)
         return pdf_ids, pdf_titles, pdf_links, pdf_authors, pdf_authors_links, pdf_subjects
         
 def download_pdf(url, pdf_dir='./pdfs/'):
