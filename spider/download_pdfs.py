@@ -9,7 +9,13 @@ from time import time
 import os
 import logging
 
+# logger = logging.getLogger()
 logger = logging.getLogger()
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(filename)s:%(lineno)s - %(name)s - %(message)s' )
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 class ArxivPdfs():
     def __init__(self, url):
@@ -67,20 +73,37 @@ class DownloadWorker(Thread):
             download_pdf(url)
             self.queue.task_done()
 
-if __name__  == '__main__':
-    a = ArxivPdfs('https://arxiv.org/list/cs.CV/pastweek?skip=0&show=8')
-    start = time()
-    download_queue = Queue.Queue(maxsize=1)
-    for x in range(8):
+def build_url(area, show_num=1000):
+    '''
+    build the url of the specified area
+    args:
+        area: the area
+        show_num: the show num, default 1000
+    return:
+        url: the url of the specified area and show num
+    '''
+    url = 'https://arxiv.org/list/{0}/pastweek?skip=0&show={1}'.format(area, show_num)
+    return url
+
+
+def run_all(area, show_num=1000, max_size=100, parallel_num=8):
+    url = build_url(area, show_num)
+    arxiv_pdfs = ArxivPdfs(url)
+    download_queue = Queue.Queue(maxsize=max_size)
+    for x in range(parallel_num):
         worker = DownloadWorker(download_queue)
         worker.daemon = True
         worker.start()
-    
-    pdf_ids, pdf_titles, pdf_links, pdf_authors, pdf_authors_links, pdf_subjects = a.get_links()
+    pdf_ids, pdf_titles, pdf_links, pdf_authors, pdf_authors_links, pdf_subjects = arxiv_pdfs.get_links()
     logger.info('extract pdfs links done, begin to download {0} pdfs '.format(len(pdf_links)))
 
     for link in pdf_links:
         download_queue.put(link)
     download_queue.join()
-    logger.info("the images num is {0}".format(len(pdf_links)))
+    # logger.info("the images num is {0}".format(len(pdf_links)))
+    # logger.info("took time : {0}".format(time() - start))
+
+if __name__  == '__main__':
+    start = time()
+    run_all('cs.cv', show_num=8, max_size=1)
     logger.info("took time : {0}".format(time() - start))
