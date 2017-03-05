@@ -5,7 +5,7 @@ import urllib2
 from lxml import html
 import Queue
 from threading import Thread
-from time import time
+import time
 import os
 import logging
 
@@ -79,6 +79,20 @@ def build_url(area, show_num=1000):
     return url
 
 
+def pdf_info_write(area,date=None, **pdf_info):
+    pdf_num = pdf_info['pdf_num']
+    area = area.replace('.','_')
+    if not date:
+        date = time.strftime('%Y-%m-%d',time.localtime(time.time()))
+    summary_file = os.path.join('../papers/pdfs/',area+'/'+date+'/'+'summary.csv')
+
+    with open(summary_file, 'w') as fw:
+        for index in xrange(pdf_num):
+            line = '{0},{1},{2},{3},{4},{5}'.format(pdf_info['pdf_ids'][index], pdf_info['pdf_titles'][index], pdf_info['pdf_links'][index], 
+                    pdf_info['pdf_authors'][index],pdf_info['pdf_authors_links'][index],pdf_info['pdf_subjects'][index])
+            fw.write(line+'\n')
+
+
 def run_all(area, show_num=1000, max_size=100, parallel_num=8):
     url = build_url(area, show_num)
     arxiv_pdfs = ArxivPdfs(url)
@@ -88,15 +102,39 @@ def run_all(area, show_num=1000, max_size=100, parallel_num=8):
         worker.daemon = True
         worker.start()
     pdf_ids, pdf_titles, pdf_links, pdf_authors, pdf_authors_links, pdf_subjects = arxiv_pdfs.get_links()
+    pdf_info = {}
+    pdf_info['pdf_num'] = len(pdf_ids)
+    pdf_info['pdf_ids'] = pdf_ids
+    pdf_info['pdf_titles'] = pdf_titles
+    pdf_info['pdf_links'] = pdf_links
+    pdf_info['pdf_authors'] = pdf_authors
+    pdf_info['pdf_authors_links'] = pdf_authors_links
+    pdf_info['pdf_subjects'] = pdf_subjects
+    pdf_info_write(area, **pdf_info)
     logger.info('extract pdfs links done, begin to download {0} pdfs '.format(len(pdf_links)))
 
     for link in pdf_links:
         download_queue.put(link)
     download_queue.join()
-    # logger.info("the images num is {0}".format(len(pdf_links)))
-    # logger.info("took time : {0}".format(time() - start))
 
 if __name__  == '__main__':
-    start = time()
-    run_all('cs.cv', show_num=8, max_size=1)
-    logger.info("took time : {0}".format(time() - start))
+    # start = time.time()
+    # run_all('cs.cv', show_num=8, max_size=1)
+    # logger.info("took time : {0}".format(time.time() - start))
+    # test the pdf_info_write
+    pdf_num = 7
+    pdf_ids = ['1', '2', '3','4']
+    pdf_titles = ['1', '2', '3','4']
+    pdf_links = ['1', '2', '3','4']
+    pdf_authors = ['1', '2', '3','4']
+    pdf_authors_links = ['1', '2', '3','4']
+    pdf_subjects = ['1', '2', '3','4']
+    pdf_info = {}
+    pdf_info['pdf_num'] = len(pdf_ids)
+    pdf_info['pdf_ids'] = pdf_ids
+    pdf_info['pdf_titles'] = pdf_titles
+    pdf_info['pdf_links'] = pdf_links
+    pdf_info['pdf_authors'] = pdf_authors
+    pdf_info['pdf_authors_links'] = pdf_authors_links
+    pdf_info['pdf_subjects'] = pdf_subjects
+    pdf_info_write('cs.cv',date='2017-03-03', **pdf_info)
