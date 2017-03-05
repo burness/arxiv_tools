@@ -28,5 +28,6 @@ https://arxiv.org/list//pastweek?skip=0&show=1000
  - [x] add the support of multi thread to download pdfs
  - [x] add the config of the url including research area
  - [x] add the module to write the all paper info to a file in the pdf folder 'summary.csv'
+    - [] add the support of filter the download failed files in the summary.csv
  - [] add the email to format the area email to the users 
  
