@@ -14,7 +14,7 @@ logger.setLevel(logging.DEBUG)
 USER_INFO_FILE = './flask/static/user_info.csv'
 MAIL_HOST = 'smtp.qq.com'
 MAIL_USER = '363544964@qq.com'
-MAIL_PASS = 'tfzgdvakzqtpbhhe'
+MAIL_PASS = 'XXXXXXXX'
 
 def run(user_info_file, download_pdfs=False):
     # user_info key: email, value: name and subjects
