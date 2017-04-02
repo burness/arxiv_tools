@@ -1,0 +1,2264 @@
+Under review in IJCV manuscript No.
+(will be inserted by the editor)
+
+BoxCars: Improving Vehicle Fine-Grained Recognition using
+3D Bounding Boxes in Traﬃc Surveillance
+
+Jakub Sochor · Jakub ˇSpaˇnhel · Adam Herout
+
+7
+1
+0
+2
+
+ 
+r
+a
+
+M
+2
+
+ 
+
+ 
+ 
+]
+
+V
+C
+.
+s
+c
+[
+ 
+ 
+
+1
+v
+6
+8
+6
+0
+0
+
+.
+
+3
+0
+7
+1
+:
+v
+i
+X
+r
+a
+
+Received: date / Accepted: date
+
+Abstract In this paper, we focus on ﬁne-grained recog-
+nition of vehicles mainly in traﬃc surveillance applica-
+tions. We propose an approach orthogonal to recent ad-
+vancement in ﬁne-grained recognition (automatic part
+discovery, bilinear pooling). Also, in contrast to other
+methods focused on ﬁne-grained recognition of vehicles,
+we do not limit ourselves to frontal/rear viewpoint but
+allow the vehicles to be seen from any viewpoint. Our
+approach is based on 3D bounding boxes built around
+the vehicles. The bounding box can be automatically
+constructed from traﬃc surveillance data. For scenarios
+where it is not possible to use the precise construction,
+we propose a method for estimation of the 3D bounding
+box. The 3D bounding box is used to normalize the im-
+age viewpoint by “unpacking” the image into plane. We
+also propose to randomly alter the color of the image
+and add a rectangle with random noise to random posi-
+tion in the image during training Convolutional Neural
+Networks. We have collected a large ﬁne-grained vehi-
+cle dataset BoxCars116k, with 116k images of vehicles
+from various viewpoints taken by numerous surveillance
+cameras. We performed a number of experiments which
+show that our proposed method signiﬁcantly improves
+CNN classiﬁcation accuracy (the accuracy is increased
+by up to 12 percent points and the error is reduced by
+up to 50 % compared to CNNs without the proposed
+modiﬁcations). We also show that our method outper-
+forms state-of-the-art methods for ﬁne-grained recogni-
+tion.
+
+Graph@FIT, Centre of Excellence IT4Innovations, Brno Uni-
+versity of Technology.
+Brno, Czech Republic
+Tel.: +420 54114-1414
+E-mail: {isochor,herout}@ﬁt.vutbr.cz
+Jakub Sochor is a Brno Ph.D. Talent Scholarship Holder —
+Funded by the Brno City Municipality.
+
+Fig. 1 Example of automatically obtained 3D bounding box
+used for ﬁne-grained vehicle classiﬁcation. Top left: vehicle
+with 2D bounding box annotation, top right: estimated con-
+tour, bottom left: estimated directions to vanishing points,
+bottom right: 3D bounding box automatically obtained
+from surveillance video (green) and our estimated 3D bound-
+ing box (red).
+
+1 Introduction
+
+Fine-grained recognition of vehicles is interesting both
+from the application point of view (surveillance, data
+retrieval, etc.) and from the point of view of research
+of general ﬁne-grained recognition applicable in other
+ﬁelds. For example, Gebru et al (2017) proposed esti-
+mation of demographic statistics based on ﬁne-grained
+recognition of vehicles. In this article, we are presenting
+methodology which considerably increases the perfor-
+mance of multiple state-of-the-art CNN architectures in
+the task of ﬁne-grained vehicle recognition. We target
+
+2
+
+Jakub Sochor et al.
+
+the traﬃc surveillance context, namely images of vehi-
+cles taken from an arbitrary viewpoint – we do not
+limit ourselves to frontal/rear viewpoints. As the im-
+ages are obtained from surveillance cameras, they have
+challenging properties – they are often small and taken
+from very general viewpoints (high elevation). Also, we
+construct the training and testing sets from images from
+diﬀerent cameras as it is common for surveillance ap-
+plications that it is not known a priori under which
+viewpoint the camera will be observing the road.
+
+Methods focused on ﬁne-grained recognition of vehi-
+cles usually have some limitations – they can be limited
+to frontal/rear viewpoint or use 3D CAD models of all
+the vehicles. Both these limitations are rather impracti-
+cal for large scale deployment. There are also methods
+for ﬁne-grained recognition in general which were ap-
+plied on vehicles. The methods recently follow several
+main directions – automatic discovery of parts (Krause
+et al, 2015; Simon and Rodner, 2015), bilinear pooling
+(Lin et al, 2015b; Gao et al, 2016), or exploiting struc-
+ture of ﬁne-grained labels (Xie et al, 2015; Zhou and
+Lin, 2016). Our method is not limited to any particular
+viewpoint and it does not require 3D models vehicles
+at all.
+
+We propose an orthogonal approach to these meth-
+ods and use CNNs with modiﬁed input to achieve better
+image normalization and data augmentation (therefore,
+our approach can be combined with other methods).
+We use 3D bounding boxes around vehicles to normal-
+ize vehicle image, see Figure 3 for examples. This work
+is based on our previous conference paper (Sochor et al,
+2016a); it pushes the performance further and mainly
+we propose a new method how to build the 3D bound-
+ing box without any prior knowledge, see Figure 1. Our
+input modiﬁcations are able to signiﬁcantly increase the
+classiﬁcation accuracy (up to 12 percent points, classi-
+ﬁcation error is reduced by up to 50 %).
+
+The key contributions of the paper are:
+
+– Complex and thorough evaluation of our previous
+
+method (Sochor et al, 2016a).
+
+– Our novel data augmentation techniques further im-
+prove the results of the ﬁne-grained recognition of
+vehicles relative both to our previous method and
+other state-of-the-art methods (Section 3.3).
+
+– We remove the requirement of the previous method
+(Sochor et al, 2016a) to know the 3D bounding box
+by estimating the bounding box both at training
+and test time (Section 3.4).
+
+– We collected more samples to the BoxCars dataset,
+increasing the dataset size almost twice, see Sec-
+tion 4.
+
+We make the collected dataset and source codes for
+the proposed algorithm publicly available1 for future
+reference and comparison.
+
+2 Related Work
+
+To provide context to the proposed method, we provide
+summary of existing ﬁne-grained recognition methods
+(both general and focused on vehicles). We also brieﬂy
+describe recent advancements in Convolutional Neural
+Networks.
+
+2.1 General Fine-Grained Object Recognition
+
+We divide the ﬁne-grained recognition methods from
+recent literature into several categories as they usually
+share some common traits. Methods exploiting anno-
+tated model parts (Parkhi et al, 2012; Liu et al, 2012;
+G¨oring et al, 2014; Zhang et al, 2013; Chai et al, 2013;
+Zhang et al, 2014, 2016a; Huang et al, 2016; Zhang et al,
+2016b) are not discussed in detail as it is not common
+in ﬁne-grained datasets of vehicles to have the parts
+annotated.
+
+2.1.1 Automatic Part Discovery
+
+Parts of classiﬁed objects may be discriminatory and
+provide lots of information for the ﬁne-grained clas-
+siﬁcation task. However, it is not practical to assume
+that the location of such parts is known a priori as
+it requires signiﬁcantly more annotation work. There-
+fore, several papers have dealt with this problem and
+proposed methods how to automatically (during both
+training and test time) discover and localize such parts.
+The methods diﬀer mainly in the way which is used for
+the discovery. The features of the parts are usually clas-
+siﬁed by SVMs (Yang et al, 2012; Duan et al, 2012; Yao,
+2012; Simon and Rodner, 2015; Krause et al, 2015).
+
+Yang et al (2012) propose to use discriminative tem-
+plates based on template-image similarity with learnt
+co-occurrences to detect diﬀerent common parts of clas-
+siﬁed objects. Duan et al (2012) propose discovery of
+discriminative parts by optimization formulated as la-
+tent Conditional Random Field on hierarchical segmen-
+tation of the images. Krause et al (2014, 2015) use au-
+tomatic discovery of parts using pose aligned images
+based on nearest neighbors of features (HOG or conv4
+CNN activations) and select for the pose aligned clus-
+ters the parts which have discriminative power. Simon
+and Rodner (2015) use deep neural activation maps to
+
+1 https://medusa.fit.vutbr.cz/traffic
+
+BoxCars: Improving Vehicle Fine-Grained Recognition using 3D Bounding Boxes in Traﬃc Surveillance
+
+3
+
+detect parts of objects which are used to build a star
+shape constellation model which is used for classiﬁca-
+tion to ﬁne-grained categories. Zhang et al (2016c) pro-
+pose to iteratively train and pick deep ﬁlters which cor-
+respond to parts.
+
+2.1.2 Methods using Bilinear Pooling
+
+Lin et al (2015b) use only convolutional layers from
+the net for extraction of features which are classiﬁed
+by bilinear classiﬁer (Pirsiavash et al, 2009). Gao et al
+(2016) followed the path of bilinear pooling and pro-
+posed a method for Compact Bilinear Pooling getting
+the same accuracy as the full bilinear pooling with a
+signiﬁcantly lower number of features.
+
+2.1.3 Other Methods
+
+Xie et al (2015) proposed to use hyper-class for data
+augmentation and regularization of ﬁne-grained deep
+learning. Zhou and Lin (2016) use CNN with Bipartite
+Graph Labeling to achieve better accuracy by exploit-
+ing the ﬁne-grained annotations and coarse body type
+(e.g. Sedan, SUV).
+
+Lin et al (2015a) use three neural networks for si-
+multaneous localization, alignment and classiﬁcation of
+images. Each of these three networks does one of the
+three tasks and they are connected into one bigger net-
+work.
+
+Yao (2012) proposed an approach which is using re-
+sponses to random templates obtained from images and
+classify merged representations of the response maps by
+SVM. Zhang et al (2012) use pose normalization kernels
+and their responses warped into a feature vector.
+
+Chai et al (2012) propose to use segmentation for
+ﬁne-grained recognition to obtain foreground parts of
+image. Similar approach was also proposed by Li et al
+(2015); however, the authors use a segmentation algo-
+rithm which is optimized and ﬁne-tuned for the pur-
+pose of ﬁne-grained recognition. Finally, Gavves et al
+(2015) propose to use object proposals to obtain fore-
+ground mask and unsupervised alignment to improve
+ﬁne-grained classiﬁcation accuracy.
+
+2.2 Fine-Grained Recognition of Vehicles
+
+The goal of ﬁne-grained recognition of vehicles is to
+identify the exact type of the vehicle, that is its make,
+model, submodel, and model year. The recognition sys-
+tem focused only on vehicles (in relation to general ﬁne-
+grained classiﬁcation of birds, dogs, etc.) can beneﬁt
+
+from that the vehicles are rigid, have some distinguish-
+able landmarks (e.g. license plates), and rigorous mo-
+dels (e.g. 3D CAD models) can be available.
+
+2.2.1 Methods Limited to Frontal/Rear Images of
+Vehicles
+
+There is a multitude of papers (Petrovic and Cootes,
+2004; Dlagnekov and Belongie, 2005; Clady et al, 2008;
+Pearce and Pears, 2011; Psyllos et al, 2011; Lee et al,
+2013; Zhang, 2013; Llorca et al, 2014) using a common
+approach: they detect the license plate (as a common
+landmark) on the vehicle and extract features from the
+area around the license plate as the front/rear parts of
+vehicles are usually discriminative.
+
+There are also papers (Zhang, 2014; Hsieh et al,
+2014; Hu et al, 2015; Liao et al, 2015; Baran et al, 2015;
+He et al, 2015) directly extracting features from frontal
+images of vehicles by diﬀerent methods and optionally
+exploiting standard structure of parts on the frontal
+mask of car (e.g. headlights).
+
+2.2.2 Methods based on 3D CAD Models
+
+There were several approaches how to deal with view-
+point variance using synthetic 3D models of vehicles.
+Lin et al (2014) propose to jointly optimize 3D model
+ﬁtting and ﬁne-grained classiﬁcation, Hsiao et al (2014)
+use detected contour and align the 3D model using 3D
+chamfer matching. Krause et al (2013) propose to use
+synthetic data to train geometry and viewpoint classi-
+ﬁers for 3D model and 2D image alignment. Prokaj and
+Medioni (2009) propose to detect SIFT features on the
+vehicle image and on every 3D model seen from a set
+of discretized viewpoints.
+
+2.2.3 Other Methods
+
+Gu and Lee (2013) propose to extract center of vehicle
+and roughly estimate the viewpoint from the bounding
+box aspect ratio. Then, they use diﬀerent Active Shape
+Models for alignment in diﬀerent viewpoints and use
+segmentation for background removal.
+
+Stark et al (2012) propose to use an extension of
+DPM (Felzenszwalb et al, 2010) to be able to handle
+multi-class recognition. The model is represented by
+latent linear multi-class SVM with HOG (Dalal and
+Triggs, 2005) features. The authors show that the sys-
+tem outperforms diﬀerent methods based on LLC (Wang
+et al, 2010) and HOG. The recognized vehicles are used
+for eye-level camera calibration.
+
+Liu et al (2016a) use deep relative distance trained
+on vehicle re-identiﬁcation task and propose to train
+
+4
+
+Jakub Sochor et al.
+
+the neural net with Coupled Clusters Loss instead of
+triplet loss.
+
+Boonsim and Prakoonwit (2016) propose a method
+for ﬁne-grained recognition of vehicles at night. The
+authors use relative position and shape of features vi-
+sible at night (e.g. lights, license plates) to identify the
+make&model of a vehicle, which is visible from the rear
+side.
+
+Fang et al (2016) propose to use an approach based
+on detected parts. The parts are obtained in an unsu-
+pervised manner as high responses from mean response
+across channels of the last convolutional layer of used
+CNN.
+
+2.2.4 Summary of Existing Methods
+
+Existing methods for ﬁne-grained classiﬁcation of ve-
+hicles usually have signiﬁcant limitations. They are ei-
+ther limited to frontal/rear viewpoints (Petrovic and
+Cootes, 2004; Dlagnekov and Belongie, 2005; Clady et al,
+2008; Pearce and Pears, 2011; Psyllos et al, 2011; Lee
+et al, 2013; Zhang, 2013; Llorca et al, 2014; Zhang,
+2014; Hsieh et al, 2014; Hu et al, 2015; Liao et al, 2015;
+Baran et al, 2015; He et al, 2015) or they require some
+knowledge about 3D models of the vehicles (Prokaj and
+Medioni, 2009; Krause et al, 2013; Hsiao et al, 2014; Lin
+et al, 2014) which can be impractical when new models
+of vehicles emerge.
+
+Our proposed method do not have such limitations.
+The method works with arbitrary viewpoints and we
+require only 3D bounding boxes of vehicles. The 3D
+bounding boxes can be either automatically constructed
+from traﬃc video surveillance data (Dubsk´a et al, 2014,
+2015) or we propose method how to estimate the 3D
+bounding boxes both at training and test time (see Sec-
+tion 3.4).
+
+2.3 Deep Convolutional Neural Networks
+
+As our methods exploits Convolutional Neural Networks
+(CNN), we provide a brief summary of recent advance-
+ments in this area. The ﬁrst version of Convolutional
+Neural Networks was proposed by LeCun et al (1998).
+Recently, CNNs got much attention than before, thanks
+to the paper by Krizhevsky et al (2012). Since then the
+performance on ImageNet was signiﬁcantly improved
+by larger and deeper variants of CNNs (Simonyan and
+Zisserman, 2014; He et al, 2016).
+
+Recently, authors also used input normalization to
+improve the performance of CNN (Taigman et al, 2014)
+and adding additional training data to CNN. Also, parts
+of the CNN can be viewed as feature extractors and
+independently reused. These trained feature extractors
+
+Fig. 2 Example of 3D bounding box and its unpacked ver-
+sion.
+
+outperform the hand-crafted features (Bluche et al, 2013;
+Taigman et al, 2014).
+
+Deep Convolutional Neural Networks were also used
+for ﬁne-grained recognition. Xiao et al (2015) proposed
+to use two nets – one for object level classiﬁcation and
+the second one for part level classiﬁcation. Yang et al
+(2015) used CNNs for ﬁne-grained recognition of vehi-
+cles.
+
+3 Proposed Methodology for Fine-Grained
+Recognition of Vehicles
+
+In agreement with the recent progress in the Convolu-
+tional Neural Networks (Taigman et al, 2014; Krizhevsky
+et al, 2012; Chatﬁeld et al, 2014), we use CNN for both
+classiﬁcation and veriﬁcation. However, we propose to
+use several data normalization and augmentation tech-
+niques to signiﬁcantly boost the classiﬁcation perfor-
+mance (up to ∼ 50 % error reduction compared to base
+net). We utilize information about 3D bounding boxes
+obtained from traﬃc surveillance camera (Dubsk´a et al,
+2014). Furthermore, we show data augmentation tech-
+niques which increased the performance and are appli-
+cable in general. Finally, to increase applicability of our
+method to scenarios where the 3D bounding box is not
+known, we propose an algorithm for bounding box es-
+timation both at training and test time.
+
+3.1 Image Normalization by Unpacking the 3D
+Bounding Box
+
+We based our work on 3D bounding boxes proposed by
+Dubsk´a et al (2014) (Fig. 3) which can be automati-
+cally obtained for each vehicle seen by a surveillance
+camera (see the original paper Dubsk´a et al (2014) for
+further details). These boxes allow us to identify side,
+roof, and front (or rear) side of vehicles in addition to
+other information about the vehicles. We use these lo-
+calized segments to normalize the image of the observed
+vehicles (considerably boosting the recognition perfor-
+mance).
+
+The normalization is done by unpacking the image
+into a plane. The plane contains rectiﬁed versions of the
+
+𝑏0𝑏1𝑏2𝑏3𝑏4𝑏5𝑏6𝑏7FSR𝑏0𝑏4𝑏5𝑏1F𝑏0𝑏3𝑏2𝑏6SRBoxCars: Improving Vehicle Fine-Grained Recognition using 3D Bounding Boxes in Traﬃc Surveillance
+
+5
+
+Fig. 3 Examples of data normalization and auxiliary data feeded to nets. Left to right: vehicle with 2D bounding box,
+computed 3D bounding box, vectors encoding viewpoints on the vehicle (View), unpacked image of the vehicle (Unpack),
+and rasterized 3D bounding box feeded to the net (Rast).
+
+front/rear (F), side (S), and roof (R). These parts are
+adjacent to each other (Fig. 2) and they are organized
+into the ﬁnal matrix U:
+
+(cid:18) 0 R
+
+(cid:19)
+
+U =
+
+F S
+
+(1)
+
+The unpacking itself is done by obtaining homogra-
+phy between points bi (Fig. 2) and perspective warping
+parts of the original image. The left top submatrix is
+ﬁlled with zeros. This unpacked version of the vehicle is
+used instead of the original image to feed the net. The
+unpacking is beneﬁcial as it localizes parts of the vehi-
+cles, normalizes their position in the image and all that
+without the necessity to use DPM or other algorithms
+for part localization. In the further text, we will refer
+to this normalization method as Unpack.
+
+3.2 Extended Input to the Neural Nets
+
+It it possible to infer additional information about the
+vehicle from the 3D bounding box and we found out
+that these data slightly improve the classiﬁcation and
+veriﬁcation performance. One piece of this auxiliary
+information is the encoded viewpoint (direction from
+which the vehicle is observed). We also add rasterized
+
+3D bounding box as additional input to the CNNs.
+Compared to our previously proposed auxiliary data
+fed to the net (Sochor et al, 2016a), we handle frontal
+and rear vehicle side diﬀerently.
+
+View The viewpoint is extracted from the orienta-
+tion of the 3D bounding box – Fig. 3. We encode the
+viewpoint as three 2D vectors vi, where i ∈ {f, s, r}
+(front/rear, side, roof ) and pass them to the net. Vec-
+tors vi are connecting the center of the bounding box
+−−−→
+with the centers of the box’s faces. Therefore, it can be
+computed as vi =
+CcCi. Point Cc is the center of the
+←→
+←→
+bounding box and it can be obtained as the intersection
+b5b3. Points Ci for i ∈ {f, s, r}
+of diagonals
+b2b4 and
+denote the centers of each face, again computed as in-
+tersections of face diagonals. In contrast to our previous
+approach (Sochor et al, 2016a), which did not take the
+direction of the vehicle into account; instead, we encode
+information about the vehicle direction (d = 1 for vehi-
+cles going to camera, d = 0 for vehicles going from the
+camera), to determine which side of the bounding box
+is the frontal one. The vectors are normalized to have
+unit size; storing them with a diﬀerent normalization
+(e.g. the front one normalized, the other in the proper
+ratio) did not improve the results.
+
+Rast Another way of encoding the viewpoint and
+also the relative dimensions of vehicles is to rasterize
+
+6
+
+Jakub Sochor et al.
+
+Fig. 4 Examples of proposed data augmentation techniques. Left most image contains the original cropped image of the
+vehicle and other images contains augmented versions of the image (Top – Color, Bottom – ImageDrop).
+
+the 3D bounding box and use it as an additional in-
+put to the net. The rasterization is done separately for
+all sides, each ﬁlled by one color. The ﬁnal rasterized
+bounding box is then a four-channel image containing
+each visible face rasterized in a diﬀerent channel. For-
+mally, point p of the rasterized bounding box T is ob-
+tained as
+
+(1, 0, 0, 0) p ∈
+(0, 1, 0, 0) p ∈
+(0, 0, 1, 0)
+(0, 0, 0, 1)
+(0, 0, 0, 0)
+
+b0b1b4b5 and d = 1
+b0b1b4b5 and d = 0
+p ∈
+p ∈
+
+b1b2b5b6
+b0b1b2b3
+
+otherwise
+
+(2)
+
+
+
+Tp =
+
+where
+points b0, b1, b4 and b5 in Figure 2.
+
+b0b1b4b5 denotes the quadrilateral deﬁned by
+
+Finally, the 3D rasterized bounding box is cropped
+by the 2D bounding box of the vehicle. For an exam-
+ple, see Figure 3, showing rasterized bounding boxes for
+diﬀerent vehicles taken from diﬀerent viewpoints.
+
+3.3 Additional Training Data Augmentation
+
+To increase the diversity of the training data, we pro-
+pose additional data augmentation techniques. The ﬁrst
+one (denoted as Color) deals with the fact that for
+ﬁne-grained recognition of vehicles (and some other ob-
+jects), the color is irrelevant. The other method (Image-
+Drop) deals with some potentially missing parts on the
+vehicle. Examples of the data augmentation are shown
+in Figure 4. Both these augmentation techniques are
+done only with predeﬁned probability during training,
+otherwise they are not modiﬁed. During testing, we do
+not modify the images at all.
+
+The results presented in Section 5.5 show that both
+these modiﬁcations improve the classiﬁcation accuracy
+both in combination with other presented techniques or
+by themselves.
+
+Color To increase training samples color variabili-
+ty, we propose to randomly alternate the color of the
+image. The alternation is done in HSV color space by
+
+adding the same random values to each pixel in the
+image (each HSV channel is processed separately).
+
+ImageDrop Inspired by Zeiler and Fergus (2014)
+who evaluated the inﬂuence of covering a part of the in-
+put image on the probability of the ground truth class,
+we take this step further and in order to deal with miss-
+ing parts on the vehicles, we take a random rectangle
+in the image and ﬁll it with random noise, eﬀectively
+dropping any information contained in that part of im-
+age.
+
+3.4 Estimation of 3D Bounding Box at Test Time
+
+As the results (Section 5) show, the most important
+part of the proposed algorithm is Unpack followed by
+Color and ImageDrop. However, the 3D bounding
+box is required for the unpacking of the vehicles and
+we acknowledge that there may be scenarios when such
+information is not available. Thus, we propose a method
+how to estimate the 3D bounding box for both training
+and test time with only limited information available.
+As proposed by Dubsk´a et al (2014), the vehicle’s
+contour and the vanishing points are required for the
+bounding box construction. Therefore, it is necessary
+to estimate the contour and the vanishing points for
+the vehicle. For estimating the vehicle contour, we use
+Fully Convolutional Encoder-Decoder network designed
+by Yang et al (2016) for general object contour detec-
+tion and masks with probabilities of vehicles contours
+for each image pixel. To obtain the ﬁnal contour, we
+search for global maxima along line segments from 2D
+bounding box centers to edge points of the 2D bounding
+box. For examples, see Figure 5.
+
+We found out that the exact position of the van-
+ishing point is not required for the 3D bounding box
+construction, but the directions to the vanishing points
+are much more important. Therefore, we use regression
+to obtain the directions towards the vanishing points
+and then assume that the vanishing points are in inﬁn-
+ity.
+
+BoxCars: Improving Vehicle Fine-Grained Recognition using 3D Bounding Boxes in Traﬃc Surveillance
+
+7
+
+Fig. 5 Estimation of 3D bounding box. Left to right: image with vehicle 2D bounding box, output of contour object detector
+(Yang et al, 2016), our constructed contour, estimated directions towards vanishing points, ground truth (green) and estimated
+(red) 3D bounding box.
+
+Following the work by Rothe et al (2016), we formu-
+lated the regression of the direction towards the vanish-
+ing points as a classiﬁcation task into bins correspond-
+ing to angles and we use ResNet50 (He et al, 2016)
+with three classiﬁcation outputs. As the training data
+for the regression we used BoxCars116k dataset (Sec-
+tion 4) with the test samples omitted. To construct the
+lines on which the vanishing points are, we use the cen-
+ter of the 2D bounding box.
+
+With all these estimated information it is then pos-
+sible to construct the 3D bounding box. It is important
+to note that using this 3D bounding box estimation,
+it is possible to use this method beyond the scope of
+traﬃc surveillance. It is only necessary to train the re-
+gressor of vanishing points directions. For training of
+such regressor, it is possible to use either the direc-
+tions themselves or viewpoints on the vehicle and focal
+lengths of the images.
+
+4 BoxCars116k Dataset
+
+There is a large number of datasets of vehicles (Rus-
+sakovsky et al, 2015; Agarwal et al, 2004; Papageorgiou
+and Poggio, 1999; Everingham et al, 2010; Xiang and
+Savarese, 2012; Caraﬃ et al, 2012; Opelt et al, 2004;
+Leibe et al, 2007; Glasner et al, 2012; Savarese and
+Fei-Fei, 2007; Geiger et al, 2012; ¨Ozuysal et al, 2009;
+Matzen and Snavely, 2013) which are usable mainly
+for vehicle detection, pose estimation, and other tasks.
+However, these datasets do not contain annotation of
+the precise vehicles’ make & model.
+
+When it comes to the ﬁne-grained datasets, a few of
+them exist and all are quite recent. Lin et al (2014) pub-
+lished FG3DCar dataset (300 images, 30 classes), Stark
+
+et al (2012) made another dataset containing 1 904 ve-
+hicles from 14 classes. Krause et al (2013) published
+two datasets; one of them, called Car Types, contains
+16k of images and 196 classes. The other one, BMW 10,
+is made of 10 models of BMW vehicles and 500 images.
+Finally, Liao et al (2015) created a dataset of 1 482 ve-
+hicles from 8 classes. All these datasets are relatively
+small for training the CNN for real-world surveillance
+tasks.
+
+Yang et al (2015) published a large dataset Comp-
+Cars. The dataset consists of a web-nature part, made
+of 136k of vehicles from 1 600 classes taken from dif-
+ferent viewpoints. Then, it also contains a surveillance-
+nature part with 50k frontal images of vehicles taken
+from surveillance cameras.
+
+Liu et al (2016b) published dataset VeRi-776 for
+vehicle re-identiﬁcation task. The dataset contains over
+50k images of 776 vehicles captured by 20 cameras cov-
+ering an 1.0 km2 area in 24 hours. Each vehicle is cap-
+tured by 2 ∼ 18 cameras in diﬀerent viewpoints, il-
+luminations, resolutions and oclusions, and various at-
+tributes like bounding boxes, vehicle types, colors and
+brands are provided.
+
+We collected and annotated a new dataset Box-
+Cars116k. The dataset is focused on images taken from
+surveillance cameras as it is meant to be useful for traf-
+ﬁc surveillance applications. We do not restrict that the
+vehicles are taken from the frontal side (Fig. 6). We used
+surveillance cameras mounted near streets and tracked
+the passing vehicles. Each correctly detected vehicle is
+captured in multiple images, as it is passing by the cam-
+era; therefore, we have more visual information about
+each vehicle.
+
+8
+
+Jakub Sochor et al.
+
+Fig. 6 Collate of random samples from the dataset.
+
+4.1 Dataset Acquisition
+
+The dataset is formed by two parts. The ﬁrst part con-
+sists of data from BoxCars21k dataset (Sochor et al,
+2016a) which were cleaned up and some imprecise an-
+notations were corrected (e.g. missing model years for
+some uncommon vehicle types).
+
+We also collected other data from videos relevant
+to our previous work (Dubsk´a et al, 2014, 2015; Sochor
+et al, 2016b). We detected all vehicles, tracked them
+and for each track collected images of the respective
+vehicle. We downsampled the framerate to ∼ 12.5 FPS
+to avoid collection of multiple almost identical images
+of the same vehicle.
+
+The new dataset was annotated by multiple hu-
+man annotators with interest in vehicles and suﬃcient
+knowledge about vehicle types and models. The anno-
+tators were assigned to clean up the processed data
+from invalid detections and assign exact vehicle type
+(make, model, submodel, year) for each obtained track.
+While preparing the dataset for annotation, 3D bound-
+ing boxes were constructed for each detected vehicle
+using the method proposed by Dubsk´a et al (2014).
+Invalid detections were then distinguished by the anno-
+tators based on this constructed 3D bounding boxes. In
+the case that all 3D bounding boxes are not constructed
+precisely, the whole track was invalidated.
+
+Vehicle type annotation reliability is guaranteed by
+providing multiple annotations for each valid track (∼ 4
+annotations per vehicle). The annotation of vehicle type
+is considered as correct in the case of at least three iden-
+tical annotations. Uncertain cases were authoritatively
+annotated by the authors.
+
+The tracks in BoxCars21k dataset consist from ex-
+actly 3 images per track. However, in the new part of
+the dataset, we collect arbitrary number of images per
+track (usually more then 3).
+
+# tracks
+# samples
+# cameras
+# make
+# make & model
+# make & model & submodel
+# make & model & submodel & model year
+
+27 496
+116 286
+137
+45
+341
+421
+693
+
+Table 1 Statistics of our new BoxCars116k dataset.
+
+Fig. 7 BoxCars116k dataset statistics – top left: 2D bound-
+ing box dimensions, top right: number of ﬁne-grained types
+samples, bottom left: azimuth distribution (0◦ denotes
+frontal viewpoint), bottom right: elevation distribution.
+
+4.2 Dataset Statistics
+
+The dataset contains 27 496 vehicles (116 286 images) of
+45 diﬀerent makes with 693 ﬁne-grained classes (make
+& model & submodel & model year) collected from 137
+diﬀerent cameras with a large variation in the view-
+points. Detailed statistics about the dataset can be found
+in Table 1 and in Figure 7. The distribution of types
+in the dataset is shown in Figure 7 (top right) and
+samples from the dataset are in Figure 6. The dataset
+includes also information about the 3D bounding box
+(Dubsk´a et al, 2014) for each vehicle and an image with
+a foreground mask extracted by background subtrac-
+tion (Stauﬀer and Grimson, 1999; Zivkovic, 2004). The
+
+0100200300size [px]4k8k12kwidthsheights0200400600type rank10010110210310415075075150azimuth [degrees]5k10k15k020406080elevation [degrees]8k16k24kBoxCars: Improving Vehicle Fine-Grained Recognition using 3D Bounding Boxes in Traﬃc Surveillance
+
+9
+
+Fig. 8 Viewpoints to dataset samples (horizontal ﬂips are not included). Red dot on the unit circle denotes the frontal
+viewpoint. Left: all samples with elevation color coding (in degrees), center: train samples for hard split with color coded by
+2D BB area (in thousands of pixels), right: test samples for hard split color coded by angle to the nearest training viewpoint
+sample (in degrees).
+
+hard medium
+
+# classes
+# trainval cameras
+# test cameras
+
+# train tracks
+# train samples
+
+# validation tracks
+# validation samples
+
+# test tracks
+# test samples
+
+107
+81
+56
+
+11 653
+51 691
+
+637
+2 763
+
+11 125
+39 149
+
+79
+81
+56
+
+12 084
+54 653
+
+611
+2 802
+
+11 456
+40 842
+
+Table 2 Statistics about splits with diﬀerent diﬃculty (hard
+and medium)
+
+dataset is made publicly available2 for future reference
+and evaluation.
+
+Compared to “web-based” datasets, the new Box-
+Cars116k dataset contains images of vehicles relevant
+to traﬃc surveillance which have speciﬁc viewpoint (high
+elevation), usually small images etc. Compared to other
+ﬁne-grained surveillance datasets, our dataset provides
+data with a high variation in viewpoints, see Figure 8.
+
+4.3 Training & Test Splits
+
+Our task is to provide a dataset for ﬁne-grained recog-
+nition in traﬃc surveillance without any viewpoint con-
+straint. Therefore, we construct the splits for training
+and evaluation in a way which reﬂects the fact that it is
+usually not known a priori from which viewpoints the
+vehicles will be seen by the surveillance camera.
+
+Thus, for the construction of the splits, we randomly
+selected cameras and used all tracks from these came-
+ras for training and vehicles from other cameras for
+testing. This way, we are testing the classiﬁcation al-
+gorithms on images of vehicles from previously unseen
+cameras (viewpoints). However, this dataset selection
+
+2 https://medusa.fit.vutbr.cz/traffic
+
+process causes that some of the vehicles from the test-
+ing set may be taken under slightly diﬀerent viewpoint
+the are present in the training set, these diﬀerences are
+shown in Figure 8 (right).
+
+We constructed two splits. In the ﬁrst one (hard),
+we are interested in recognition of precise type inclu-
+ding model year. In the other one (medium), we omit
+the diﬀerence in model years and all vehicles of the
+same subtype (and potentially diﬀerent model years)
+are present in the same class. We selected only types
+which have at least 15 tracks in the training set and at
+least one track in the testing set. The statistics about
+the splits are shown in Table 2.
+
+5 Experiments
+
+We thoroughly evaluated our proposed algorithm on
+the BoxCars116k dataset. First, we evaluated how these
+methods improve for diﬀerent nets, compared them to
+the state of the art, and analyzed how using approx-
+imate 3D bounding boxes inﬂuence the achieved ac-
+curacy. Then, we searched for the main source of im-
+provements, analyzed improvements of diﬀerent modi-
+ﬁcations separately, and we also evaluated the usability
+of features from the trained nets for the task of vehicle
+type identity veriﬁcation.
+
+To show that our modiﬁcations improve the accu-
+racy independently on the used nets, we use several of
+them:
+
+– AlexNet (Krizhevsky et al, 2012)
+– VGG16, VGG19 (Simonyan and Zisserman, 2014)
+– ResNet50, ResNet101, ResNet152 (He et al,
+
+2016)
+
+– CNNs with Compact Bilinear Pooling layer (Gao
+et al, 2016) in combination with VGG nets denoted
+as VGG16+CBL and VGG19+CBL.
+
+As there are several options how to use the pro-
+posed modiﬁcations of input data and add additional
+
+10
+
+Jakub Sochor et al.
+
+auxiliary data, we deﬁne several labels which we will
+use:
+
+– ALL – All ﬁve proposed modiﬁcations (Unpack,
+
+Color, ImageDrop, View, Rast).
+
+– IMAGE – Modiﬁcations working only on the image
+
+level (Unpack, Color, ImageDrop).
+
+– CVPR16 – Modiﬁcations as proposed in our pre-
+vious CVPR paper (Sochor et al, 2016a) (Unpack,
+View, Rast – however, for the View and Rast mod-
+iﬁcations diﬀer from those ones used in this pa-
+per as the original modiﬁcations do not distinguish
+frontal/rear side of vehicles).
+
+ligible and therefore it is reasonable to only use the IM-
+AGE modiﬁcations. This also results into CNNs which
+uses just the Unpack modiﬁcation during test time as
+the other modiﬁcations (Color, ImageDrop) are used
+only during ﬁne-tuning of CNNs.
+
+Also, the evaluation shows that the results are al-
+most identical for the hard and medium split; therefore,
+we will further only report results on the hard split, as it
+is the main goal to distinguish also the model years. The
+names for the splits were chosen to be consistent with
+the original version of dataset (Sochor et al, 2016a) and
+the small diﬀerence between medium and hard split ac-
+curacies is caused mainly by the size of the new dataset.
+
+5.1 Improvements for Diﬀerent CNNs
+
+The ﬁrst experiment which we have done is evaluation
+how our modiﬁcations improve classiﬁcation accuracy
+for diﬀerent CNNs.
+
+All the nets were ﬁne-tuned from models pre-trained
+on ImageNet (Russakovsky et al, 2015) for approxi-
+mately 15 epochs which was suﬃcient for the nets to
+converge. We used the same batch size (except for Res-
+Net151, where we had to use smaller batch size because
+of GPU memory limitations), the same initial learning
+rate and learning rate decay and the same hyperpa-
+rameters for every net (initial learning rate 2.5 · 10−3,
+weight decay 5 · 10−4, quadratic learning rate decay,
+loss is averaged over 100 iterations). We also used stan-
+dard data augmentation techniques as horizontal ﬂip
+and randomly moving bounding box (Simonyan and
+Zisserman, 2014). As ResNets do not use fully con-
+nected layers, we only report IMAGE modiﬁcations
+for them.
+
+The results for both medium and hard splits are
+shown in Table 3. As we have correspondences between
+the samples in the dataset and know which samples are
+from the same track, we are able to use mean probabil-
+ity across track samples and merge the classiﬁcation for
+the whole track. Therefore we always report the results
+in form single sample accuracy/whole track accuracy.
+As expected, the results for whole tracks are much bet-
+ter than for single samples.
+
+There are several things which should be noted about
+the results. The most important one is that our modiﬁ-
+cations signiﬁcantly improve classiﬁcation accuracy (up
+to +12 percent points) and reduce classiﬁcation er-
+ror (up to 50 % error reduction). Another important
+fact is that our new modiﬁcations push the accuracy
+much further compared to the original method (Sochor
+et al, 2016a).
+
+The table also shows that the diﬀerence between
+ALL modiﬁcations and IMAGE modiﬁcations is neg-
+
+5.2 Comparison with the State of the Art
+
+In order to examine the performance of our method, we
+also evaluated other state-of-the-art methods for ﬁne-
+grained recognition. We used 3 diﬀerent algorithms for
+general ﬁne-grained recognition with published code.
+We always ﬁrst used the code to reproduce the results
+in respective papers to ensure that we are using the
+published work correctly. All of the methods use CNNs
+and the used net inﬂuences the accuracy, therefore the
+results should be compared with respective base CNNs.
+It was impossible to evaluate methods focused only
+on ﬁne-grained recognition of vehicles as they are usu-
+ally limited to frontal/rear viewpoint or require 3D mod-
+els of vehicles for all the types. In the following text we
+deﬁne labels for each evaluated state-of-the-art method
+and describe details for the method separately.
+
+BCNN Lin et al (2015b) proposed to use Bilinear
+CNN. We used VGG-M and VGG16 networks in a
+symmetric setup (details in the original paper), and
+trained the nets for 30 epochs (the nets were converged
+around the 20th epoch). We also used image ﬂipping to
+augment the training set.
+
+CBL We modiﬁed compatible nets with Compact
+BiLinear Pooling proposed by Gao et al (2016) which
+followed the work of Lin et al (2015b) and reduced the
+number of output features of the bilinear layers. We
+used the Caﬀe implementation of the layer provided by
+the authors and used 8 192 features. We trained the net
+using the same hyper-parameters, protocol, and data
+augmentation as described in Section 5.1.
+
+PCM Simon and Rodner (2015) propose Part Con-
+stellation Models and use neural activations (see the
+paper for the details) to get the parts of the model.
+We used AlexNet (BVLC Caﬀe reference version) and
+VGG19 as base nets for the method. We used the same
+hyper-parameters as the authors with the exception of
+ﬁne-tuning number of iterations which was increased,
+
+BoxCars: Improving Vehicle Fine-Grained Recognition using 3D Bounding Boxes in Traﬃc Surveillance
+
+11
+
+SPLIT: HARD
+
+accuracy [%]
+
+improvement [pp]
+
+error reduction [%]
+
+AlexNet + ALL
+AlexNet + IMAGE
+AlexNet + CVPR16
+AlexNet (Krizhevsky et al, 2012)
+
+VGG16 + ALL
+VGG16 + IMAGE
+VGG16 + CVPR16
+VGG16 (Simonyan and Zisserman, 2014)
+
+VGG16+CBL + ALL
+VGG16+CBL + IMAGE
+VGG16+CBL + CVPR16
+VGG16+CBL (Gao et al, 2016)
+
+VGG19 + IMAGE
+VGG19 + ALL
+VGG19 + CVPR16
+VGG19 (Simonyan and Zisserman, 2014)
+
+VGG19+CBL + ALL
+VGG19+CBL + IMAGE
+VGG19+CBL + CVPR16
+VGG19+CBL (Gao et al, 2016)
+
+ResNet50 + IMAGE
+ResNet50 (He et al, 2016)
+
+ResNet101 + IMAGE
+ResNet101 (He et al, 2016)
+
+ResNet152 + IMAGE
+ResNet152 (He et al, 2016)
+
+77.79/88.60
+77.67/88.28
+70.21/81.67
+66.65/77.75
+
+84.13/92.27
+83.79/92.23
+79.58/89.27
+77.26/86.71
+
+75.06/83.42
+75.04/83.16
+70.94/81.08
+70.38/80.11
+
+83.91/92.17
+84.12/92.00
+79.69/89.42
+76.74/86.06
+
+75.62/83.76
+75.47/83.56
+71.92/81.64
+70.69/80.26
+
+82.27/90.79
+75.48/84.61
+
+83.41/91.59
+76.46/85.31
+
+83.74/91.71
+77.68/86.20
+
++11.15/+10.85
++11.02/+10.53
++3.56/+3.92
+—
+
++6.88/+5.56
++6.53/+5.53
++2.32/+2.56
+—
+
++4.67/+3.31
++4.66/+3.05
++0.56/+0.97
+—
+
++7.17/+6.11
++7.38/+5.94
++2.95/+3.36
+—
+
++4.93/+3.50
++4.78/+3.30
++1.23/+1.38
+—
+
++6.79/+6.18
+—
+
++6.95/+6.27
+—
+
++6.06/+5.51
+—
+
+33.42/48.77
+33.04/47.31
+10.68/17.62
+—
+
+30.24/41.85
+28.71/41.58
+10.22/19.27
+—
+
+15.78/16.63
+15.73/15.32
+1.88/4.88
+—
+
+30.83/43.84
+31.74/42.62
+12.69/24.11
+—
+
+16.82/17.71
+16.31/16.71
+4.20/6.97
+—
+
+27.69/40.13
+—
+
+29.52/42.72
+—
+
+27.16/39.93
+—
+
+SPLIT: MEDIUM
+
+accuracy [%]
+
+improvement [pp]
+
+error reduction [%]
+
+AlexNet + IMAGE
+AlexNet + ALL
+AlexNet + CVPR16
+AlexNet (Krizhevsky et al, 2012)
+
+VGG16 + ALL
+VGG16 + IMAGE
+VGG16 + CVPR16
+VGG16 (Simonyan and Zisserman, 2014)
+
+VGG16+CBL + IMAGE
+VGG16+CBL + ALL
+VGG16+CBL + CVPR16
+VGG16+CBL (Gao et al, 2016)
+
+VGG19 + ALL
+VGG19 + IMAGE
+VGG19 + CVPR16
+VGG19 (Simonyan and Zisserman, 2014)
+
+VGG19+CBL + IMAGE
+VGG19+CBL + ALL
+VGG19+CBL + CVPR16
+VGG19+CBL (Gao et al, 2016)
+
+ResNet50 + IMAGE
+ResNet50 (He et al, 2016)
+
+ResNet101 + IMAGE
+ResNet101 (He et al, 2016)
+
+ResNet152 + IMAGE
+ResNet152 (He et al, 2016)
+
+77.77/88.16
+77.52/87.52
+70.90/82.18
+65.68/76.53
+
+83.89/91.75
+83.93/91.69
+79.50/88.58
+75.96/85.39
+
+75.67/83.49
+75.47/83.23
+71.07/81.02
+70.74/80.22
+
+84.43/92.22
+83.98/91.71
+80.26/89.39
+75.40/84.34
+
+76.88/84.63
+75.47/83.88
+72.53/81.90
+71.54/80.67
+
+82.28/90.63
+75.07/83.55
+
+83.10/90.80
+77.05/85.61
+
+83.80/91.38
+78.44/86.98
+
++12.09/+11.64
++11.84/+10.99
++5.23/+5.65
+—
+
++7.93/+6.36
++7.96/+6.30
++3.54/+3.19
+—
+
++4.93/+3.27
++4.73/+3.01
++0.33/+0.80
+—
+
++9.03/+7.88
++8.58/+7.37
++4.87/+5.05
+—
+
++5.34/+3.95
++3.92/+3.20
++0.98/+1.22
+—
+
++7.21/+7.09
+—
+
++6.05/+5.19
+—
+
++5.36/+4.40
+—
+
+35.21/49.57
+34.49/46.82
+15.22/24.06
+—
+
+32.99/43.55
+33.13/43.13
+14.71/21.86
+—
+
+16.84/16.55
+16.15/15.23
+1.12/4.06
+—
+
+36.70/50.33
+34.88/47.05
+19.78/32.27
+—
+
+18.75/20.46
+13.79/16.58
+3.46/6.32
+—
+
+28.90/43.08
+—
+
+26.37/36.08
+—
+
+24.85/33.78
+—
+
+Table 3 Improvements of our proposed modiﬁcations for diﬀerent CNNs. The accuracy is reported as single sample accu-
+racy/track accuracy. We also present improvement in percent points and classiﬁcation error reduction in the same format.
+
+12
+
+Jakub Sochor et al.
+
+method
+
+accuracy [%]
+
+speed [FPS]
+
+AlexNet (Krizhevsky et al, 2012)
+VGG16 (Simonyan and Zisserman, 2014)
+VGG19 (Simonyan and Zisserman, 2014)
+Resnet50 (He et al, 2016)
+Resnet101 (He et al, 2016)
+Resnet152 (He et al, 2016)
+
+BCNN (VGG-M) (Lin et al, 2015b)
+BCNN (VGG16) (Lin et al, 2015b)
+CBL (VGG16) (Gao et al, 2016)
+CBL (VGG19) (Gao et al, 2016)
+PCM (AlexNet) (Simon and Rodner, 2015)
+PCM (VGG19) (Simon and Rodner, 2015)
+
+AlexNet + ALL (ours)
+VGG16 + ALL (ours)
+VGG19 + ALL (ours)
+VGG16+CBL + ALL (ours)
+VGG19+CBL + ALL (ours)
+Resnet50 + IMAGE (ours)
+Resnet101 + IMAGE (ours)
+Resnet152 + IMAGE (ours)
+
+66.65/77.75
+77.26/86.71
+76.74/86.06
+75.48/84.61
+76.46/85.31
+77.68/86.20
+
+64.83/72.22
+69.64/78.56
+70.38/80.11
+70.69/80.26
+63.24/73.94
+75.99/85.24
+
+77.79/88.60
+84.13/92.27
+84.12/92.00
+75.06/83.42
+75.62/83.76
+82.27/90.79
+83.41/91.59
+83.74/91.71
+
+963
+173
+146
+155
+95
+66
+87∗
+10∗
+165
+141
+15
+4
+
+580
+154
+133
+146
+126
+151
+93
+65
+
+Table 4 Comparison of diﬀerent vehicle ﬁne-grained recognition methods. Accuracy is reported as single image accuracy/whole
+track accuracy. Processing speed was measured on a machine with GTX1080 and CUDNN. ∗ FPS reported by authors.
+
+net
+
+no modiﬁcation GT 3D BB estimated 3D BB
+
+AlexNet
+VGG16
+VGG19
+VGG16+CBL
+VGG19+CBL
+ResNet50
+ResNet101
+ResNet152
+
+66.65/77.75
+77.26/86.71
+76.74/86.06
+70.38/80.11
+70.69/80.26
+75.48/84.61
+76.46/85.31
+77.68/86.20
+
+77.67/88.28
+83.79/92.23
+83.91/92.17
+75.04/83.16
+75.47/83.56
+82.27/90.79
+83.41/91.59
+83.74/91.71
+
+74.81/87.30
+80.60/90.59
+81.43/91.57
+72.83/82.92
+73.09/83.09
+79.60/90.40
+80.20/90.42
+80.87/90.93
+
+Table 5 Comparison of classiﬁcation accuracy (percent) on the hard split with standard nets without any modiﬁcations,
+IMAGE modiﬁcations using 3D bounding box from surveillance data, and IMAGE modiﬁcations using estimated 3D BB
+(Section 3.4).
+
+and the C parameter of used linear SVM was cross-
+validated on the training data.
+
+The results of all the comparisons can be found in
+Table 4. As the table shows, our method signiﬁcantly
+outperforms both standard CNNs (Krizhevsky et al,
+2012; Simonyan and Zisserman, 2014; He et al, 2016)
+and methods for ﬁne-grained recognition (Lin et al,
+2015b; Simon and Rodner, 2015; Gao et al, 2016). The
+results for ﬁne-grained recognition methods should be
+compared with the same used base network as for dif-
+ferent networks, they provide diﬀerent results. Our best
+accuracy (84 %) is better by a large margin compared to
+all other variants (both standard CNN and ﬁne-grained
+methods).
+
+In order to provide approximate information about
+the processing eﬃciency, we measured how many im-
+ages of vehicles are diﬀerent methods and networks able
+to process per second (referenced as FPS). The mea-
+
+surement was done with GTX1080 and CUDNN when-
+ever possible. In the case of BCNN we report the num-
+bers reported by the authors, as we were forced to save
+some intermediate data to disk because we were not
+able to ﬁt all the data to memory (∼200 GB). The re-
+sults are also shown in Table 4; they show that our input
+modiﬁcation decreased the processing speed; however,
+the speed penalty is small and the method is still well
+usable for real-time processing.
+
+5.3 Inﬂuence of Using Estimated 3D Bounding Boxes
+instead of the Surveillance Ones
+
+We also evaluated how the results will be inﬂuenced
+when instead of using the 3D bounding boxes obtained
+from the surveillance data (long-time observation of
+video (Dubsk´a et al, 2014, 2015)), the estimated 3D
+bounding boxes (Section 3.4) would be used.
+
+BoxCars: Improving Vehicle Fine-Grained Recognition using 3D Bounding Boxes in Traﬃc Surveillance
+
+13
+
+Fig. 9 Correlation of improvement relative to CNNs without modiﬁcation with respect to train-test viewpoint diﬀerence. The
+x-axis contains bins viewpoint diﬀerence bins (in degrees), and the y-axis denotes improvement compared to base net in percent
+points, see Section 5.4 for details. The graphs show that with increasing viewpoint diﬀerence, the accuracy improvement of
+our method increases.
+
+The classiﬁcation results are shown in Table 5; they
+show that the proposed modiﬁcations still signiﬁcantly
+improve the accuracy even if only the estimated 3D
+bounding box – the less accurate one – is used. This
+result is fairly important, as it enables to transfer this
+method to diﬀerent (non-surveillance) scenarios. The
+only additional data which is then required is a reliable
+training set of directions towards the vanishing points
+(or viewpoints and focal length) from the vehicles (or
+other rigid objects).
+
+5.4 Impact of Training/Testing Viewpoint Diﬀerence
+
+We were also interested what is the main source of the
+classiﬁcation accuracy improvement. We have analyzed
+several possibilities and found out that the most impor-
+tant aspect is viewpoint diﬀerence.
+
+For every training and testing sample we computed
+the viewpoint (unit 3D vector from vehicles’ 3D bound-
+ing boxes centers) and for each testing sample we found
+one training sample with the lowest angle between its
+viewpoint and the test sample viewpoint (see Figure 10).
+Then, we divided the testing samples into several bins
+based on the computed angle. For each of these bins we
+computed the accuracy for the standard nets without
+any modiﬁcations and nets with the proposed modi-
+ﬁcations. Finally, for accuracy each of the nets with
+modiﬁcations and each bin we subtracted the accuracy
+of corresponding net without any modiﬁcation yielding
+improvement (in percent points) for the given modiﬁ-
+cations and bin. The results are displayed in Figure 9.
+There are several facts which should be noted. The
+ﬁrst and the most important is that the Unpack mod-
+iﬁcation alone improves the accuracy signiﬁcantly for
+larger viewpoint diﬀerences (the accuracy is improved
+
+Fig. 10 Left column: test samples, right column: samples
+from train set with the lowest angle between its viewpoint and
+the test sample viewpoint.
+
+by more then 20 percent points for the last bin). The
+other important fact which should be noted is that the
+other modiﬁcations (mainly Color and ImageDrop)
+push the accuracy furthermore independently on the
+training-testing viewpoint diﬀerence.
+
+5.5 Impact of Individual Modiﬁcations
+
+We were also curious how diﬀerent modiﬁcations by
+themselves help to improve the accuracy. We conducted
+two types of experiments, which focus on diﬀerent as-
+
+0◦ − 2◦2◦ − 4◦4◦ − 6◦6◦ − 13◦051015202530AlexNet + ALL  + IMAGE  + Unpack0◦ − 2◦2◦ − 4◦4◦ − 6◦6◦ − 13◦5051015202530ResNet50 + IMAGE  + Unpack0◦ − 2◦2◦ − 4◦4◦ − 6◦6◦ − 13◦010203040ResNet101 + IMAGE  + Unpack0◦ − 2◦2◦ − 4◦4◦ − 6◦6◦ − 13◦5051015202530ResNet152 + IMAGE  + Unpack0◦ − 2◦2◦ − 4◦4◦ − 6◦6◦ − 13◦50510152025VGG16 + ALL  + IMAGE  + Unpack0◦ − 2◦2◦ − 4◦4◦ − 6◦6◦ − 13◦051015202530VGG19 + ALL  + IMAGE  + Unpack0◦ − 2◦2◦ − 4◦4◦ − 6◦6◦ − 13◦051015VGG16+CBL + ALL  + IMAGE  + Unpack0◦ − 2◦2◦ − 4◦4◦ − 6◦6◦ − 13◦02468101214VGG19+CBL + ALL  + IMAGE  + Unpackangle:0.14◦angle:3.02◦angle:5.28◦angle:11.06◦14
+
+Jakub Sochor et al.
+
+AlexNet
+
+VGG16+CBL VGG19+CBL VGG16
+
+VGG19
+
+mean
+
+best
+
+Unpack
++3.47/+4.37 +0.69/+1.06
+−0.96/−1.20 −0.19/−0.19
+View
+−0.80/−1.18 +0.30/+0.27
+Rast
+Color
++4.80/+3.60 +2.08/+0.97
+ImageDrop +0.05/−0.47 +0.29/−0.43
+Table 6 Improvements for diﬀerent nets and modiﬁcations computed as [base net + modiﬁcation] − [base net].
+
++2.07/+2.51 +3.29/+3.48 +2.11/+2.55 +3.47/+4.37
+−0.46/−0.93 −0.19/+0.26 −0.32/−0.35 +0.19/+0.31
+−0.20/−0.08 +0.28/+0.09 −0.03/−0.04 +0.30/+0.72
++2.72/+1.38 +3.79/+2.55 +3.17/+2.03 +4.80/+3.60
++0.63/+0.07 +1.00/+0.84 +0.70/+0.20 +1.53/+0.96
+
++1.02/+1.31
++0.19/+0.31
++0.28/+0.72
++2.47/+1.65
++1.53/+0.96
+
+AlexNet
+
+VGG16+CBL VGG19+CBL VGG16
+
+VGG19
+
+mean
+
+best
+
++6.93/+7.60 +2.18/+2.22
+Unpack
++0.09/+0.18 −0.41/−0.19
+View
++0.22/+0.17 +0.11/−0.08
+Rast
+Color
++6.34/+6.18 +2.54/+1.28
+ImageDrop +1.07/+0.79 +4.24/+3.54
+Table 7 Improvements for diﬀerent nets and modiﬁcations computed as [base net + all] − [base net + all − modiﬁcation].
+
++2.82/+2.46 +3.07/+2.82 +3.41/+3.48 +6.93/+7.60
++0.36/+0.15 +0.05/−0.27 −0.14/−0.15 +0.36/+0.18
++0.30/+0.20 −0.01/−0.11 −0.03/−0.08 +0.30/+0.20
++3.08/+1.73 +2.92/+1.67 +3.42/+2.43 +6.34/+6.18
++0.89/+0.05 +1.19/+0.68 +1.32/+0.77 +4.24/+3.54
+
++2.06/+2.32
+−0.78/−0.64
+−0.76/−0.58
++2.21/+1.31
+−0.79/−1.21
+
+net
+
+accuracy [%]
+
+all types merged types
+
+77.79/88.60
+AlexNet + ALL
+84.13/92.27
+VGG16 + ALL
+75.06/83.42
+VGG16+CBL + ALL
+84.12/92.00
+VGG19 + ALL
+75.62/83.76
+VGG19+CBL + ALL
+82.27/90.79
+ResNet50 + IMAGE
+ResNet101 + IMAGE 83.41/91.59
+ResNet152 + IMAGE 83.74/91.71
+
+79.08/89.70
+85.42/93.28
+76.82/85.07
+85.51/92.97
+78.56/86.62
+83.51/91.79
+84.65/92.55
+85.10/92.84
+
+Table 8 Comparison of accuracy with all types and 8 merged
+types into supertypes.
+
+5.6 Vehicle Types Resisting to Fine-Grained
+Recognition
+
+As possible applications of the ﬁne-grained recognition
+may vary, we merged pairs of ﬁne-grained classes dur-
+ing testing into one supertype. The merge was done for
+vehicles which are made by the same concern, have the
+same dimensions, and which are only diﬀerentiated by
+subtle branding details on the mask. This merge can
+be beneﬁcial if the task is for example determining the
+dimensions of the vehicle.
+
+We merged 8 pairs of vehicle types (see Figure 11
+for an example) aﬀecting 1 034 tracks and 5 567 image
+samples. We show the results in Table 8; the accuracy
+improves only slightly – by ∼ 1 percent point).
+
+Fig. 11 Example of vehicle types merged into one supertype.
+Left: Renault Traﬃc, right: Opel Vivaro.
+
+pects of the modiﬁcations. The evaluation is not done
+on ResNets, as we only use IMAGE level modiﬁcations
+with ResNets; thus, we can not evaluate Rast and View
+modiﬁcations with ResNets.
+
+The ﬁrst experiment is focused on the inﬂuence of
+the modiﬁcation by itself. Therefore, we compute the
+accuracy improvement (in accuracy percent points) for
+the modiﬁcations as [base net+modiﬁcation]−[base net],
+where [. . .] stands for the accuracy of the classiﬁer de-
+scribed by its contents. The results are shown in Ta-
+ble 6. As it can be seen in the table, the most positive
+modiﬁcations are Color, Unpack, and ImageDrop.
+
+The second experiment evaluates how a given modi-
+ﬁcation contributed to the accuracy improvement when
+all of the modiﬁcations are used. Thus, the improve-
+ment is computed as [base net + all ]− [base net + all −
+modiﬁcation]. See Table 7 for the results, which conﬁrm
+the previous ﬁndings and Color, Unpack, and Image-
+Drop are again the most positive modiﬁcations.
+
+5.7 Vehicle Type Veriﬁcation
+
+Lastly, we evaluated the quality of features extracted
+from the last layer of the convolutional nets for the ver-
+iﬁcation task. Under the term veriﬁcation, we under-
+stand the task to determine whether a pair of vehicle
+tracks share the same ﬁne-grained type or not. In agree-
+
+BoxCars: Improving Vehicle Fine-Grained Recognition using 3D Bounding Boxes in Traﬃc Surveillance
+
+15
+
+Fig. 12 Precision-Recall curves for veriﬁcation of ﬁne-grained types. Black dots represent the human performance.
+
+ment with previous works in the ﬁeld (Taigman et al,
+2014), we use cosine distance between the features for
+the veriﬁcation.
+
+We collected random 5 millions of random pairs of
+vehicle tracks from test part of BoxCars116k splits and
+evaluate the veriﬁcation on these pairs. As we used
+tracks which can have a diﬀerent number of vehicle im-
+ages, we use 9 random pairs of images for each pair of
+tracks and used median distance between these image
+pairs as the distance between the whole tracks.
+
+Precision-Recall curves and Average Precisions are
+shown in Figure 12. As the results show, our modiﬁ-
+cations signiﬁcantly improve the average precision for
+each CNN in the given task. Also, as the ﬁgure shows,
+the method outperforms human performance (black dots
+in Figure 12), as reported in the previous paper (Sochor
+et al, 2016a).
+
+6 Conclusion
+
+This article presents and sums up multiple algorith-
+mic modiﬁcations suitable for CNN-based ﬁne-grained
+recognition of vehicles. Some of the modiﬁcations were
+originally proposed in a conference paper (Sochor et al,
+2016a), some are results of the ongoing research. We
+also propose a method for obtaining the 3D bound-
+ing boxes necessary for the image unwrapping (which
+has the largest impact on the performance improve-
+ment) without observing a surveillance video, but only
+working with the individual input image. This consid-
+erably increases the application potential of the pro-
+posed methodology (and the performance for such es-
+timated 3D bboxes is only somewhat lower than when
+the “proper” bounding boxes are used). We focused on
+
+thorough evaluation of the methods: we couple them
+with multiple state-of-the-art CNN architectures (Si-
+monyan and Zisserman, 2014; He et al, 2016), we mea-
+sure the contribution/inﬂuence of individual modiﬁca-
+tions.
+
+Our method signiﬁcantly improves the classiﬁcation
+accuracy (up to +12 percent points) and reduces
+the classiﬁcation error (up to 50 % error reduction)
+compared to the base CNNs. Also, our method outper-
+forms other state-of-the-art methods (Lin et al, 2015b;
+Simon and Rodner, 2015; Gao et al, 2016) by 9 per-
+cent points in single image accuracy and by 7 per-
+cent points in whole track accuracy.
+
+We collected, processed, and annotated a dataset
+BoxCars116k targeted to ﬁne-grained recognition of ve-
+hicles in the surveillance domain. Contrary to majority
+of existing vehicle recognition datasets, the viewpoints
+are greatly varying and they correspond to surveillance
+scenarios; the existing datasets are mostly collected from
+web images and the vehicles are typically captured from
+eye-level positions. This dataset is made publicly avail-
+able for future research and evaluation.
+
+Acknowledgment
+
+This work was supported by The Ministry of Education,
+Youth and Sports of the Czech Republic from the Na-
+tional Programme of Sustainability (NPU II); project
+IT4Innovations excellence in science – LQ1602.
+
+References
+
+Agarwal S, Awan A, , Roth D (2004) Learning to detect
+objects in images via a sparse, part-based represen-
+
+0.00.20.40.60.81.00.00.20.40.60.81.0AlexNet + ALL  0.665 + IMAGE  0.657 + CVPR16 0.603 0.5120.00.20.40.60.81.00.00.20.40.60.81.0ResNet50 + IMAGE  0.734 0.5480.00.20.40.60.81.00.00.20.40.60.81.0ResNet101 + IMAGE  0.766 0.5750.00.20.40.60.81.00.00.20.40.60.81.0ResNet152 + IMAGE  0.764 0.6450.00.20.40.60.81.00.00.20.40.60.81.0VGG16 + ALL  0.849 + IMAGE  0.845 + CVPR16 0.827 0.7560.00.20.40.60.81.00.00.20.40.60.81.0VGG19 + ALL  0.869 + IMAGE  0.857 + CVPR16 0.837 0.7640.00.20.40.60.81.00.00.20.40.60.81.0VGG16+CBL + ALL  0.888 + IMAGE  0.891 + CVPR16 0.845 0.8400.00.20.40.60.81.00.00.20.40.60.81.0VGG19+CBL + ALL  0.905 + IMAGE  0.898 + CVPR16 0.876 0.86416
+
+Jakub Sochor et al.
+
+tation. IEEE PAMI 26(11):1475–1490 7
+
+IEEE Transactions on 16(3):1162–1171 4, 8, 12
+
+Baran R, Glowacz A, Matiolanski A (2015) The eﬃ-
+cient real- and non-real-time make and model recog-
+nition of cars. Multimedia Tools and Applications
+74(12):4269–4288 3, 4
+
+Bluche T, Ney H, Kermorvant C (2013) Feature extrac-
+tion with convolutional neural networks for handwrit-
+ten word recognition. In: International Conference on
+Document Analysis and Recognition (ICDAR), pp
+285–289 4
+
+Boonsim N, Prakoonwit S (2016) Car make and
+model recognition under limited lighting conditions
+at night. Pattern Analysis and Applications pp 1–13
+4
+
+Caraﬃ C, Vojir T, Trefny J, Sochman J, Matas J (2012)
+A System for Real-time Detection and Tracking of
+Vehicles from a Single Car-mounted Camera. In: ITS
+Conference, pp 975–982 7
+
+Chai Y, Rahtu E, Lempitsky V, Van Gool L, Zisser-
+man A (2012) Tricos: A tri-level class-discriminative
+co-segmentation method for image classiﬁcation. In:
+European Conference on Computer Vision 3
+
+Chai Y, Lempitsky V, Zisserman A (2013) Symbiotic
+segmentation and part localization for ﬁne-grained
+categorization. In: Computer Vision (ICCV), 2013
+IEEE International Conference on, pp 321–328 2
+
+Chatﬁeld K, Simonyan K, Vedaldi A, Zisserman A
+(2014) Return of the devil in the details: Delving deep
+into convolutional nets. In: British Machine Vision
+Conference 4
+
+Clady X, Negri P, Milgram M, Poulenard R (2008)
+Multi-class vehicle type recognition system. In: Pro-
+ceedings of the 3rd IAPR Workshop on Artiﬁcial
+Neural Networks in Pattern Recognition, Springer-
+Verlag, Berlin, Heidelberg, ANNPR ’08, pp 228–239
+3, 4
+
+Dalal N, Triggs B (2005) Histograms of oriented gradi-
+ents for human detection. In: Computer Vision and
+Pattern Recognition, 2005. CVPR 2005. IEEE Com-
+puter Society Conference on, IEEE, vol 1, pp 886–893
+3
+
+Dlagnekov L, Belongie S (2005) Recognizing cars. Tech.
+
+rep., UCSD CSE Tech Report CS2005-0833 3, 4
+
+Duan K, Parikh D, Crandall D, Grauman K (2012) Dis-
+covering localized attributes for ﬁne-grained recogni-
+tion. In: IEEE Conference on Computer Vision and
+Pattern Recognition (CVPR) 2
+
+Dubsk´a M, Sochor J, Herout A (2014) Automatic cam-
+era calibration for traﬃc understanding. In: BMVC
+4, 6, 8, 12
+
+Dubsk´a M, Herout A, Jur´anek R, Sochor J (2015)
+Fully automatic roadside camera calibration for traf-
+ﬁc surveillance. Intelligent Transportation Systems,
+
+Everingham M, Van Gool L, Williams CKI, Winn J,
+Zisserman A (2010) The pascal visual object classes
+(VOC) challenge. IJCV 88(2):303–338 7
+
+Fang J, Zhou Y, Yu Y, Du S (2016) Fine-grained
+vehicle model recognition using a coarse-to-ﬁne
+convolutional neural network architecture.
+IEEE
+Transactions on Intelligent Transportation Systems
+PP(99):1–11 4
+
+Felzenszwalb P, Girshick R, McAllester D, Ramanan D
+(2010) Object detection with discriminatively trained
+part-based models. IEEE Transactions on Pattern
+Analysis and Machine Intelligence 32(9):1627–1645
+3
+
+Gao Y, Beijbom O, Zhang N, Darrell T (2016) Com-
+pact bilinear pooling. In: The IEEE Conference on
+Computer Vision and Pattern Recognition (CVPR)
+2, 3, 9, 10, 11, 12, 15
+
+Gavves E, Fernando B, Snoek C, Smeulders A, Tuyte-
+laars T (2015) Local alignments for ﬁne-grained cate-
+gorization. International Journal of Computer Vision
+111(2):191–212 3
+
+Gebru T, Krause J, Wang Y, Chen D, Deng J, Aiden
+EL, Fei-Fei L (2017) Using deep learning and google
+street view to estimate the demographic makeup of
+the us, arXiv:1702.06683 1
+
+Geiger A, Lenz P, Urtasun R (2012) Are we ready for
+autonomous driving? the KITTI vision benchmark
+suite. In: CVPR 7
+
+Glasner D, Galun M, Alpert S, Basri R, Shakhnarovich
+G (2012) Viewpoint-aware object detection and con-
+tinuous pose estimation. Image&Vision Comp 7
+
+Gu HZ, Lee SY (2013) Car model recognition by utiliz-
+ing symmetric property to overcome severe pose vari-
+ation. Machine Vision and Applications 24(2):255–
+274 3
+
+G¨oring C, Rodner E, Freytag A, Denzler J (2014) Non-
+parametric part transfer for ﬁne-grained recognition.
+In: IEEE Conference on Computer Vision and Pat-
+tern Recognition (CVPR), pp 2489–2496 2
+
+He H, Shao Z, Tan J (2015) Recognition of car makes
+and models from a single traﬃc-camera image. IEEE
+Transactions on Intelligent Transportation Systems
+PP(99):1–11 3, 4
+
+He K, Zhang X, Ren S, Sun J (2016) Deep residual
+learning for image recognition. In: The IEEE Confer-
+ence on Computer Vision and Pattern Recognition
+(CVPR) 4, 7, 9, 11, 12, 15
+
+Hsiao E, Sinha S, Ramnath K, Baker S, Zitnick L,
+Szeliski R (2014) Car make and model recognition
+using 3D curve alignment. In: IEEE WACV 3, 4
+
+Hsieh JW, Chen LC, Chen DY (2014) Symmetrical surf
+and its applications to vehicle detection and vehicle
+
+BoxCars: Improving Vehicle Fine-Grained Recognition using 3D Bounding Boxes in Traﬃc Surveillance
+
+17
+
+make and model recognition. Intelligent Transporta-
+tion Systems, IEEE Transactions on 15(1):6–20 3,
+4
+
+Hu C, Bai X, Qi L, Wang X, Xue G, Mei L (2015)
+Learning discriminative pattern for real-time car
+brand recognition. Intelligent Transportation Sys-
+tems, IEEE Transactions on 16(6):3170–3181 3, 4
+
+Huang S, Xu Z, Tao D, Zhang Y (2016) Part-stacked
+cnn for ﬁne-grained visual categorization. In: The
+IEEE Conference on Computer Vision and Pattern
+Recognition (CVPR) 2
+
+Krause J, Stark M, Deng J, Fei-Fei L (2013) 3D ob-
+ject representations for ﬁne-grained categorization.
+In: ICCV Workshop 3dRR-13 3, 4, 7
+
+Krause J, Gebru T, Deng J, Li LJ, Fei-Fei L (2014)
+Learning features and parts for ﬁne-grained recog-
+nition. In: Pattern Recognition (ICPR), 2014 22nd
+International Conference on, pp 26–33 2
+
+Krause J, Jin H, Yang J, Fei-Fei L (2015) Fine-grained
+recognition without part annotations. In: IEEE Con-
+ference on Computer Vision and Pattern Recognition
+(CVPR) 2
+
+Krizhevsky A, Sutskever I, Hinton GE (2012) Ima-
+genet classiﬁcation with deep convolutional neural
+networks. In: Pereira F, Burges C, Bottou L, Wein-
+berger K (eds) Advances in Neural Information Pro-
+cessing Systems 25, Curran Associates, Inc., pp 1097–
+1105 4, 9, 11, 12
+
+LeCun Y, Bottou L, Bengio Y, Haﬀner P (1998)
+Gradient-based learning applied to document recog-
+nition. Proceedings of the IEEE 86(11):2278–2324 4
+Lee S, Gwak J, Jeon M (2013) Vehicle model recog-
+nition in video. International Journal of Signal Pro-
+cessing, Image Processing and Pattern Recognition
+6(2):175 3, 4
+
+Leibe B, Cornelis N, Cornelis K, Van Gool L (2007)
+Dynamic 3D scene analysis from a moving vehicle.
+In: CVPR, pp 1–8 7
+
+Li L, Guo Y, Xie L, Kong X, Tian Q (2015) Fine-
+Grained Visual Categorization with Fine-Tuned Seg-
+mentation. IEEE International Conference on Image
+Processing 3
+
+Liao L, Hu R, Xiao J, Wang Q, Xiao J, Chen J (2015)
+Exploiting eﬀects of parts in ﬁne-grained categoriza-
+tion of vehicles. In: International Conference on Im-
+age Processing (ICIP) 3, 4, 7
+
+Lin D, Shen X, Lu C, Jia J (2015a) Deep lac: Deep local-
+ization, alignment and classiﬁcation for ﬁne-grained
+recognition. In: The IEEE Conference on Computer
+Vision and Pattern Recognition (CVPR) 3
+
+Lin TY, RoyChowdhury A, Maji S (2015b) Bilinear cnn
+models for ﬁne-grained visual recognition. In: Inter-
+national Conference on Computer Vision (ICCV) 2,
+
+3, 10, 12, 15
+
+Lin YL, Morariu VI, Hsu W, Davis LS (2014) Jointly
+optimizing 3D model ﬁtting and ﬁne-grained classiﬁ-
+cation. In: ECCV 3, 4, 7
+
+Liu H, Tian Y, Yang Y, Pang L, Huang T (2016a) Deep
+relative distance learning: Tell the diﬀerence between
+similar vehicles. In: The IEEE Conference on Com-
+puter Vision and Pattern Recognition (CVPR) 3
+
+Liu J, Kanazawa A, Jacobs D, Belhumeur P (2012)
+Dog breed classiﬁcation using part localization. In:
+Fitzgibbon A, Lazebnik S, Perona P, Sato Y, Schmid
+C (eds) ECCV 2012, Lecture Notes in Computer Sci-
+ence, vol 7572, Springer Berlin Heidelberg, pp 172–
+185 2
+
+Liu X, Liu W, Ma H, Fu H (2016b) Large-scale vehi-
+cle re-identiﬁcation in urban surveillance videos. In:
+Multimedia and Expo (ICME), 2016 IEEE Interna-
+tional Conference on, IEEE, pp 1–6 7
+
+Llorca DF, Col´as D, Daza IG, Parra I, Sotelo MA
+(2014) Vehicle model recognition using geometry and
+appearance of car emblems from rear view images.
+In: 17th International IEEE Conference on Intelli-
+gent Transportation Systems (ITSC), pp 3094–3099
+3, 4
+
+Matzen K, Snavely N (2013) NYC3DCars: A dataset of
+3D vehicles in geographic context. In: International
+Conference on Computer Vision (ICCV) 7
+
+Opelt A, Fussenegger M, Pinz A, Auer P (2004) Generic
+object recognition with boosting. Tech. Rep. TR-
+EMT-2004-01, EMT, TU Graz, Austria, submitted
+to the IEEE Tr. PAMI 7
+
+¨Ozuysal M, Lepetit V, Fua P (2009) Pose estimation
+for category speciﬁc multiview object localization. In:
+IEEE CVPR, pp 778–785 7
+
+Papageorgiou C, Poggio T (1999) A trainable object de-
+tection system: Car detection in static images. Tech.
+Rep. 1673, (CBCL Memo 180) 7
+
+Parkhi OM, Vedaldi A, Zisserman A, Jawahar CV
+(2012) Cats and dogs. In: IEEE Conference on Com-
+puter Vision and Pattern Recognition 2
+
+Pearce G, Pears N (2011) Automatic make and model
+recognition from frontal images of cars. In: IEEE
+AVSS, pp 373–378 3, 4
+
+Petrovic V, Cootes TF (2004) Analysis of features for
+rigid structure vehicle type recognition. In: BMVC,
+pp 587–596 3, 4
+
+Pirsiavash H, Ramanan D, Fowlkes CC (2009) Bilinear
+classiﬁers for visual recognition. In: Bengio Y, Schu-
+urmans D, Laﬀerty J, Williams C, Culotta A (eds)
+Advances in Neural Information Processing Systems
+22, Curran Associates, Inc., pp 1482–1490 3
+
+Prokaj J, Medioni G (2009) 3-D model based vehicle
+
+recognition. In: IEEE WACV 3, 4
+
+18
+
+Jakub Sochor et al.
+
+Psyllos A, Anagnostopoulos C, Kayafas E (2011) Ve-
+hicle model recognition from frontal view image
+measurements. Computer Standards & Interfaces
+33(2):142 – 151, {XVI} {IMEKO} {TC4} Sympo-
+sium and {XIII} International Workshop on {ADC}
+Modelling and Testing 3, 4
+
+Rothe R, Timofte R, Van Gool L (2016) Deep expecta-
+tion of real and apparent age from a single image
+without facial landmarks. International Journal of
+Computer Vision pp 1–14 7
+
+Russakovsky O, Deng J, Su H, Krause J, Satheesh S,
+Ma S, Huang Z, Karpathy A, Khosla A, Bernstein
+M, Berg AC, Fei-Fei L (2015) ImageNet Large Scale
+Visual Recognition Challenge. IJCV 7, 10
+
+Savarese S, Fei-Fei L (2007) 3D generic object catego-
+rization, localization and pose estimation. In: ICCV,
+IEEE 7
+
+Simon M, Rodner E (2015) Neural activation constella-
+tions: Unsupervised part model discovery with con-
+volutional networks. In: International Conference on
+Computer Vision (ICCV) 2, 10, 12, 15
+
+Simonyan K, Zisserman A (2014) Very deep convo-
+lutional networks for large-scale image recognition.
+CoRR abs/1409.1556 4, 9, 10, 11, 12, 15
+
+Sochor J, Herout A, Havel J (2016a) Boxcars: 3d boxes
+as cnn input for improved ﬁne-grained vehicle recog-
+nition. In: The IEEE Conference on Computer Vision
+and Pattern Recognition (CVPR) 2, 5, 8, 10, 15
+
+Sochor J, Jur´anek R, ˇSpaˇnhel J, Marˇs´ık L, ˇSirok´y A,
+Herout A, Zemˇc´ık P (2016b) BrnoCompSpeed: Re-
+view of traﬃc camera calibration and a comprehen-
+sive dataset for monocular speed measurement. Intel-
+ligent Transportation Systems (under review), IEEE
+Transactions on 8
+
+Stark M, Krause J, Pepik B, Meger D, Little J, Schiele
+B, Koller D (2012) Fine-grained categorization for 3D
+scene understanding. In: BMVC 3, 7
+
+Stauﬀer C, Grimson WEL (1999) Adaptive background
+mixture models for real-time tracking. In: CVPR,
+vol 2, pp 246–252 8
+
+Taigman Y, Yang M, Ranzato M, Wolf L (2014) Deep-
+Face: Closing the gap to human-level performance in
+face veriﬁcation. In: CVPR, pp 1701–1708 4, 15
+
+Wang J, Yang J, Yu K, Lv F, Huang T, Gong Y (2010)
+Locality-constrained linear coding for image classiﬁ-
+cation. In: CVPR, pp 3360–3367 3
+
+Xiang Y, Savarese S (2012) Estimating the aspect lay-
+out of object categories. In: CVPR, pp 3410–3417 7
+Xiao T, Xu Y, Yang K, Zhang J, Peng Y, Zhang Z
+(2015) The application of two-level attention mod-
+els in deep convolutional neural network for ﬁne-
+grained image classiﬁcation. In: The IEEE Confer-
+ence on Computer Vision and Pattern Recognition
+
+(CVPR) 4
+
+Xie S, Yang T, Wang X, Lin Y (2015) Hyper-class
+augmented and regularized deep learning for ﬁne-
+grained image classiﬁcation. In: The IEEE Confer-
+ence on Computer Vision and Pattern Recognition
+(CVPR) 2, 3
+
+Yang J, Price B, Cohen S, Lee H, Yang MH (2016)
+Object contour detection with a fully convolutional
+encoder-decoder network. In: Proceedings of the
+IEEE Conference on Computer Vision and Pattern
+Recognition, pp 193–202 6, 7
+
+Yang L, Luo P, Change Loy C, Tang X (2015) A large-
+scale car dataset for ﬁne-grained categorization and
+veriﬁcation. In: The IEEE Conference on Computer
+Vision and Pattern Recognition (CVPR) 4, 7
+
+Yang S, Bo L, Wang J, Shapiro LG (2012) Unsuper-
+vised template learning for ﬁne-grained object recog-
+nition. In: Pereira F, Burges C, Bottou L, Weinberger
+K (eds) Advances in Neural Information Processing
+Systems 25, Curran Associates, Inc., pp 3122–3130 2
+Yao B (2012) A codebook-free and annotation-free
+approach for ﬁne-grained image categorization. In:
+Proceedings of the 2012 IEEE Conference on Com-
+puter Vision and Pattern Recognition (CVPR), IEEE
+Computer Society, Washington, DC, USA, CVPR
+’12, pp 3466–3473 2, 3
+
+Zeiler MD, Fergus R (2014) Visualizing and under-
+standing convolutional networks. In: European con-
+ference on computer vision, Springer, pp 818–833 6
+Zhang B (2013) Reliable classiﬁcation of vehicle
+types based on cascade classiﬁer ensembles. IEEE
+Transactions on Intelligent Transportation Systems
+14(1):322–332 3, 4
+
+Zhang B (2014) Classiﬁcation and identiﬁcation of ve-
+hicle type and make by cortex-like image descriptor
+HMAX. IJCVR 4:195–211 3, 4
+
+Zhang H, Xu T, Elhoseiny M, Huang X, Zhang S,
+Elgammal A, Metaxas D (2016a) Spda-cnn: Unify-
+ing semantic part detection and abstraction for ﬁne-
+grained recognition. In: The IEEE Conference on
+Computer Vision and Pattern Recognition (CVPR)
+2
+
+Zhang L, Yang Y, Wang M, Hong R, Nie L, Li X
+(2016b) Detecting densely distributed graph patterns
+for ﬁne-grained image categorization. IEEE Transac-
+tions on Image Processing 25(2):553–565 2
+
+Zhang N, Farrell R, Darrell T (2012) Pose pooling ker-
+nels for sub-category recognition. In: Computer Vi-
+sion and Pattern Recognition (CVPR), 2012 IEEE
+Conference on, pp 3665–3672 3
+
+Zhang N, Farrell R, Iandola F, Darrell T (2013) De-
+formable part descriptors for ﬁne-grained recognition
+and attribute prediction. In: The IEEE International
+
+BoxCars: Improving Vehicle Fine-Grained Recognition using 3D Bounding Boxes in Traﬃc Surveillance
+
+19
+
+Conference on Computer Vision (ICCV) 2
+
+Zhang N, Donahue J, Girshick R, Darrell T (2014) Part-
+based R-CNNs for ﬁne-grained category detection.
+In: Proceedings of the European Conference on Com-
+puter Vision (ECCV) 2
+
+Zhang X, Xiong H, Zhou W, Lin W, Tian Q (2016c)
+Picking deep ﬁlter responses for ﬁne-grained image
+recognition. In: The IEEE Conference on Computer
+Vision and Pattern Recognition (CVPR) 3
+
+Zhou F, Lin Y (2016) Fine-grained image classiﬁcation
+by exploring bipartite-graph labels. In: The IEEE
+Conference on Computer Vision and Pattern Recog-
+nition (CVPR) 2, 3
+
+Zivkovic Z (2004) Improved adaptive gaussian mixture
+model for background subtraction. In: ICPR, pp 28–
+31 8
+
+

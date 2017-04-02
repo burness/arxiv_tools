@@ -11,12 +11,12 @@ import logging
 import codecs
 
 # logger = logging.getLogger()
-logger = logging.getLogger()
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s - %(filename)s:%(lineno)s - %(name)s - %(message)s' )
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger('arxiv_tools')
+# handler = logging.StreamHandler()
+# formatter = logging.Formatter('%(asctime)s - %(filename)s:%(lineno)s - %(name)s - %(message)s' )
+# handler.setFormatter(formatter)
+# logger.addHandler(handler)
+# logger.setLevel(logging.DEBUG)
 
 class ArxivPdfs():
     def __init__(self, url):
@@ -40,15 +40,15 @@ class ArxivPdfs():
         pdf_authors = [pdf_author.xpath('string(.)') for pdf_author in pdf_authors]
         pdf_authors = [author.replace('\n','') for author in pdf_authors]
         pdf_authors = [author.replace('Authors: ','') for author in pdf_authors]
+        pdf_authors = [author.replace(',','') for author in pdf_authors]
         pdf_subjects = content.xpath('//span[@class="primary-subject"]/text()')
         return pdf_ids, pdf_describe_links, pdf_titles, pdf_links, pdf_authors, pdf_authors_links, pdf_subjects
         
-def download_pdf(url, area, pdf_dir='../papers/pdfs/'):
+def download_pdf(url, area, pdf_dir='./papers/pdfs/'):
     area = area.replace('.','_')
     date = time.strftime('%Y-%m-%d',time.localtime(time.time()))
     pdf_dir = os.path.join(pdf_dir, area+'/'+date)
-    if not os.path.exists(pdf_dir):
-        os.makedirs(pdf_dir)
+    
     filename = os.path.join(pdf_dir,url.split('/')[-1])
     try:
         f = urllib2.urlopen(url)
@@ -94,7 +94,7 @@ def pdf_info_write(area,date=None, **pdf_info):
     area = area.replace('.','_')
     if not date:
         date = time.strftime('%Y-%m-%d',time.localtime(time.time()))
-    summary_file = os.path.join('../papers/pdfs/',area+'/'+date+'/'+'summary.csv')
+    summary_file = os.path.join('./papers/pdfs/',area+'/'+date+'/'+'summary.csv')
 
     with codecs.open(summary_file, 'w', encoding='utf-8') as fw:
         for index in xrange(pdf_num):
@@ -109,15 +109,30 @@ def pdf_info_write(area,date=None, **pdf_info):
             fw.write(line.decode('utf-8'))
     logger.info('Write to {0} successful'.format(summary_file))
 
-def run_all(area, show_num=1000, max_size=100, parallel_num=8):
+def run_all(area, show_num=2, max_size=100, parallel_num=8, download_pdfs=False, pdf_dir='./papers/pdfs/'):
+    
+    date = time.strftime('%Y-%m-%d',time.localtime(time.time()))
+    pdf_dir = os.path.join(pdf_dir, area+'/'+date)
+    if not os.path.exists(pdf_dir.lower()):
+        try:
+            os.makedirs(pdf_dir)
+        except:
+            logger.info('Other thread Create')
     url = build_url(area, show_num)
+    area = area.replace('.','_')
+    logger.info('url: {0}'.format(url))
     arxiv_pdfs = ArxivPdfs(url)
-    download_queue = Queue.Queue(maxsize=max_size)
-    for x in range(parallel_num):
-        worker = DownloadWorker(download_queue, area)
-        worker.daemon = True
-        worker.start()
+    if download_pdfs:
+        download_queue = Queue.Queue(maxsize=max_size)
+        for x in range(parallel_num):
+            worker = DownloadWorker(download_queue, area)
+            worker.daemon = True
+            worker.start()
     pdf_ids, pdf_describe_links, pdf_titles, pdf_links, pdf_authors, pdf_authors_links, pdf_subjects = arxiv_pdfs.get_links()
+    if download_pdfs:
+        for link in pdf_links:
+            download_queue.put(link)
+            download_queue.join()
     # print pdf_titles
     pdf_info = {}
     pdf_info['pdf_num'] = len(pdf_ids)
@@ -129,11 +144,10 @@ def run_all(area, show_num=1000, max_size=100, parallel_num=8):
     pdf_info['pdf_authors_links'] = pdf_authors_links
     pdf_info['pdf_subjects'] = pdf_subjects
     logger.info('extract pdfs links done, begin to download {0} pdfs '.format(len(pdf_links)))
-
-    for link in pdf_links:
-        download_queue.put(link)
-    download_queue.join()
+    logger.info('subject: {0}'.format(area))
     pdf_info_write(area, **pdf_info)
+    # download the all pdfs
+
 
 if __name__  == '__main__':
     start = time.time()
