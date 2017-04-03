@@ -37,7 +37,9 @@
  - [x] add the email to format the area email to the users
  - [x] add the flask module including add the user email
  - [x] add the module that python read the pdf files, detailed in [Python读取PDF内容](https://zhuanlan.zhihu.com/p/20910680)
- - []  replace the write file to sqite data
+ - [] replace the write file to sqite data
+    - [] replace write_file with write_sqite_file
+    - [] replace the run() in deploy_email and deploy_download_pdfs.py to be sqite version
  - [] add the module of the paper recommendation
 
 

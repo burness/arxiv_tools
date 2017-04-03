@@ -19,9 +19,9 @@ class ReusableForm(Form):
 def write_file(**user_info):
     # write the file with amend mode
     with open(USER_INFO_FILE,'a') as fwrite:
-        file_no = fwrite.fileno()
+        # file_no = fwrite.fileno()
         # add the lock of the file when you write the content to the file
-        fcntl.lockf(file_no,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        # fcntl.lockf(file_no,fcntl.LOCK_EX|fcntl.LOCK_NB)
         temp_line = user_info['name'] +',' +user_info['subject']+',' + user_info['email']+'\n'
         fwrite.write(temp_line)
 
@@ -46,7 +46,7 @@ def register_email():
             write_file(**user_info)
         else:
             flash('Error: All the form fields are required. ')
- 
+
     return render_template('hello.html', form=form)
  
 if __name__ == "__main__":
