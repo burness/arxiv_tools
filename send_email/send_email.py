@@ -66,6 +66,7 @@ class SendEmail(object):
                 print line
                 print author_list
                 print len(author_list), len(author_link_list)
+                author_list = filter(None, author_list)
                 author_link = ['<a href={0}>{1}</a>'.format(author_link_list[index],author) for index, author in enumerate(author_list)]
                 temp_message_text = paper_link+','.join(author_link)
                 self.message_text += temp_message_text + '<br></p>'
@@ -101,7 +102,7 @@ class SendEmail(object):
 if __name__ == '__main__':
     mail_host = 'smtp.qq.com'
     mail_user = '363544964@qq.com'
-    mail_pass = 'tfzgdvakzqtpbhhe'
+    mail_pass = 'xxxxxxxxx'
     send_email = SendEmail(mail_host=mail_host, mail_user=mail_user, mail_pass=mail_pass, area_week_file='../papers/pdfs/cs_cl/2017-04-03/summary.csv')
     send_email.set_sender(sender_email='363544964@qq.com')
     send_email.set_receivers(receivers_email=['dss_1990@sina.com','burness1990@163.com'])

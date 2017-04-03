@@ -37,6 +37,7 @@
  - [x] add the email to format the area email to the users
  - [x] add the flask module including add the user email
  - [x] add the module that python read the pdf files, detailed in [Python读取PDF内容](https://zhuanlan.zhihu.com/p/20910680)
+ - []  replace the write file to sqite data
  - [] add the module of the paper recommendation
 
 

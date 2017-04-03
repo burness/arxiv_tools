@@ -38,9 +38,11 @@ class ArxivPdfs():
         pdf_authors_links = [','.join(pdf_author.xpath('a/@href')) for pdf_author in pdf_authors]
         pdf_authors_links = [','.join(['https://arxiv.org'+j for j in i.split(',')]) for i in pdf_authors_links]
         pdf_authors = [pdf_author.xpath('string(.)') for pdf_author in pdf_authors]
-        pdf_authors = [author.replace('\n','') for author in pdf_authors]
+        pdf_authors = [author.replace('\n','\\') for author in pdf_authors]
+        pdf_authors = [author.replace('\n,',' ') for author in pdf_authors]
         pdf_authors = [author.replace('Authors: ','') for author in pdf_authors]
         pdf_authors = [author.replace(',','') for author in pdf_authors]
+        pdf_authors = [author.replace('\\',',') for author in pdf_authors]
         pdf_subjects = content.xpath('//span[@class="primary-subject"]/text()')
         return pdf_ids, pdf_describe_links, pdf_titles, pdf_links, pdf_authors, pdf_authors_links, pdf_subjects
         
