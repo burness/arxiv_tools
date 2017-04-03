@@ -112,7 +112,7 @@ def pdf_info_write(area,date=None, **pdf_info):
 def run_all(area, show_num=2, max_size=100, parallel_num=8, download_pdfs=False, pdf_dir='./papers/pdfs/'):
     
     date = time.strftime('%Y-%m-%d',time.localtime(time.time()))
-    pdf_dir = os.path.join(pdf_dir, area+'/'+date)
+    pdf_dir = os.path.join(pdf_dir, area.replace('.','_')+'/'+date)
     if not os.path.exists(pdf_dir.lower()):
         try:
             os.makedirs(pdf_dir)
